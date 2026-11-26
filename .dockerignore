@@ -1,0 +1,9 @@
+.git
+.work
+.github
+data
+out
+tests
+**/__pycache__
+*.md
+mvumgrab

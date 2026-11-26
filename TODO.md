@@ -1,6 +1,6 @@
 # mvumgrab TODO
 
-- [IN PROGRESS] Phone app (plan 2026-11-25, tracking `.work/2026-11-25-phone-app.jsonl`): vector MVUM for all forests -> GPX, offline PWA on icebox behind Tailscale serve, GHCR image, DockSTARTer override. Done: vector GPX, phone PWA (offline, smoke-tested), merged forest list, refresh thread. Next: Dockerfile + CI, then gated publish/deploy.
+- [IN PROGRESS] Phone app (plan 2026-11-25, tracking `.work/2026-11-25-phone-app.jsonl`): vector MVUM for all forests -> GPX, offline PWA on icebox behind Tailscale serve, GHCR image, DockSTARTer override. Done: vector GPX, phone PWA (offline, smoke-tested), merged forest list, refresh thread. Container done (Dockerfile on GDAL 3.13.3, PUID/PGID entrypoint, CI test + tag-only GHCR publish). Next (needs Jake OK): public GitHub repo + v0.1.0 tag, then icebox deploy (ds override, Tailscale serve).
 - [PENDING] Trail records with no line anywhere in USFS public data (~4,070, mostly Tonto 1,497, Custer Gallatin 1,285, Beaverhead-Deerlodge 464): find per-forest sources only if Jake goes there. Counted as `missing` in `data/vector/index.json`.
 - [PENDING] Jake: copy `out/MVUM Chugach.sqlitedb` to the phone, confirm it shows under Overlay map (WebP tiles). If blank, reconvert with Tiles = PNG and note it here.
 - [PENDING] Forests with "none found" (~25, mostly R1/R3/R6/R8): their MVUMs are Avenza-only or on odd pages. Add per-forest overrides only for forests Jake actually visits.
