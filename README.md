@@ -16,7 +16,7 @@ Needs `python3` (stdlib only) and Docker. The first run pulls `ghcr.io/osgeo/gda
 
 1. **Refresh catalog** (first time, ~15 min): crawls every region's forest pages for MVUM PDFs.
 2. Filter / expand Region → Forest → map; tick maps, whole forests, regions, or **Select all shown**.
-3. Pick options and **Convert selected**. About 1–2 min per map.
+3. Pick options and **Convert selected**. About 3 min per map at zoom 14.
 4. Files land in `out/`. Copy them to the phone:
    `Android/media/net.osmand.plus/files/tiles/` (F-Droid build: whichever `net.osmand.*` folder exists).
 5. OsmAnd → Configure map → **Overlay map** → pick the MVUM; use the transparency slider.

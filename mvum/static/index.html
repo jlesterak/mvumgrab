@@ -183,7 +183,7 @@ function updateSel() {
   const forests = new Set(chosen.map(([f]) => f.slug));
   const known = chosen.reduce((a, [, m]) => a + (m.size || 0), 0);
   $('#selsum').textContent = chosen.length ? `${chosen.length} map${chosen.length > 1 ? 's' : ''} in ${forests.size} forest${forests.size > 1 ? 's' : ''}` +
-    (known ? ` · ${fmtMB(known)} of PDFs cached` : '') + ` · ~2 min per map` : 'Nothing selected';
+    (known ? ` · ${fmtMB(known)} of PDFs cached` : '') + ` · ~3 min per map` : 'Nothing selected';
   $('#go').disabled = !chosen.length || lastJobRunning;
 }
 $('#tree').addEventListener('click', e => {
