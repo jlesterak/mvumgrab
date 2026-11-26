@@ -1,6 +1,10 @@
 # mvumgrab TODO
 
-- [IN PROGRESS] Phone app (plan 2026-11-25, tracking `.work/2026-11-25-phone-app.jsonl`): vector MVUM for all forests -> GPX, offline PWA on icebox behind Tailscale serve, GHCR image, DockSTARTer override. Done: vector GPX, phone PWA (offline, smoke-tested), merged forest list, refresh thread. Container done (Dockerfile on GDAL 3.13.3, PUID/PGID entrypoint, CI test + tag-only GHCR publish). Next (needs Jake OK): public GitHub repo + v0.1.0 tag, then icebox deploy (ds override, Tailscale serve).
+- [IN PROGRESS] Phone app (plan 2026-11-25, tracking `.work/2026-11-25-phone-app.jsonl`). Built, validated, published: github.com/jlesterak/mvumgrab, `ghcr.io/jlesterak/mvumgrab:0.1.0`. Left, when icebox is up (Jake OK'd all four 2026-11-25):
+  1. Create `icebox:git/mvumgrab.git`, add remote `icebox`, push.
+  2. Paste `homelab/proposals/mvumgrab/override-block.yml` into icebox's override, copy the proposal to `~/dockstarter-template-proposals/mvumgrab/`, `docker compose up -d mvumgrab`, check `curl icebox:8765/healthz`.
+  3. Jake runs (sudo): install Tailscale on icebox, `sudo tailscale up`, `sudo tailscale serve --bg --https=443 http://127.0.0.1:8765`. Phone: open the ts.net URL, Add to Home screen.
+  4. Homepage entry (`picebox/homepage/services.yaml`, near Songarr) + ENVIRONMENT.md icebox line, one homelab commit; copy services.yaml to picebox.
 - [PENDING] Trail records with no line anywhere in USFS public data (~4,070, mostly Tonto 1,497, Custer Gallatin 1,285, Beaverhead-Deerlodge 464): find per-forest sources only if Jake goes there. Counted as `missing` in `data/vector/index.json`.
 - [PENDING] Jake: copy `out/MVUM Chugach.sqlitedb` to the phone, confirm it shows under Overlay map (WebP tiles). If blank, reconvert with Tiles = PNG and note it here.
 - [PENDING] Forests with "none found" (~25, mostly R1/R3/R6/R8): their MVUMs are Avenza-only or on odd pages. Add per-forest overrides only for forests Jake actually visits.
