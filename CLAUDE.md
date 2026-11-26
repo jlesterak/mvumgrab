@@ -25,6 +25,7 @@ overlays (PDF) for OsmAnd. See README.md for use.
 - `data/` (catalog, PDF cache, `edw/` zips, `vector/` per-forest GeoJSON lines) and `out/` are gitignored.
   `MVUM_DATA`, `MVUM_OUT`, `MVUM_CATALOG` override paths; the container uses `/config/{data,out}`.
 - UI smoke test: `~/.venvs/playwright/bin/python tests/ui_smoke.py [--convert]` (phone app offline + admin UI).
+- Deployed on icebox (:8765, override block, pinned tag; bump by hand): phone URL https://icebox.tailc62bfc.ts.net.
 - Image: `ghcr.io/jlesterak/mvumgrab`, built by GitHub Actions on `v*` tags only; version in `mvum/__init__.py`.
 - Remotes: `origin` = github.com/jlesterak/mvumgrab (public since 2026-11-25; pushes OK'd for this work, ask for new
-  releases); `icebox:git/mvumgrab.git` planned (Jake OK'd). Commits use the GitHub noreply email (repo-local config).
+  releases); `icebox` = icebox:git/mvumgrab.git (private). Commits use the GitHub noreply email (repo-local config).
