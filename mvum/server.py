@@ -80,7 +80,11 @@ def start_job(map_ids, maxzoom, per, white, fmt="webp"):
             if not chosen:
                 continue
             if per == "map":
-                groups += [(out_name(f["name"], m.get("title") or m["name"]), [m]) for m in chosen]
+                for m in chosen:
+                    n = out_name(f["name"], m.get("title") or m["name"])
+                    if any(g[0] == n for g in groups):  # two maps with the same title: keep both files
+                        n += f" ({m['id']})"
+                    groups.append((n, [m]))
             else:
                 groups.append((out_name(f["name"]), chosen))
     if not groups:

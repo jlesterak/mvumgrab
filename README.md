@@ -34,6 +34,8 @@ Needs `python3` (stdlib only) and Docker. The first run pulls `ghcr.io/osgeo/gda
 
 - Forests that publish MVUMs only through Avenza or the national Digital Maps app show as
   **none found** / **Avenza only**, with a link to the forest's page.
+- A few USFS PDFs are plain (not georeferenced) PDFs; those maps fail with "PDF has no georeferencing".
+  The Avenza store usually has a georeferenced copy.
 - Insets and road tables printed inside a map's frame sit at the main map's coordinates (same as Avenza).
 
 ## CLI

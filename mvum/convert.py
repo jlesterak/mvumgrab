@@ -14,6 +14,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -46,9 +47,18 @@ def gdal(*args, stdin=None):
 # ---------- download ----------
 
 def _head(url):
-    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+    """Size/date/type of a remote file. Box.com answers HEAD with 404, so fall back to a 1-byte ranged GET."""
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return {"final_url": r.geturl(), "size": int(r.headers.get("Content-Length") or 0),
+                    "modified": r.headers.get("Last-Modified") or "", "type": r.headers.get("Content-Type") or ""}
+    except urllib.error.HTTPError:
+        pass
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Range": "bytes=0-0"})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return {"final_url": r.geturl(), "size": int(r.headers.get("Content-Length") or 0),
+        total = (r.headers.get("Content-Range") or "").rpartition("/")[2]
+        return {"final_url": r.geturl(), "size": int(total) if total.isdigit() else 0,
                 "modified": r.headers.get("Last-Modified") or "", "type": r.headers.get("Content-Type") or ""}
 
 
@@ -124,22 +134,22 @@ def inspect(pdf):
     return pages
 
 
-def warp_map(pdf, map_id, maxzoom, white_transparent, progress=lambda *_: None):
+def warp_map(pdf, map_id, maxzoom, white_transparent, progress=lambda *_: None, work=WORK):
     """Each georeferenced page -> work/<id>[_pN].tif in EPSG:3857 on the maxzoom grid. Returns (tifs, title)."""
-    os.makedirs(WORK, exist_ok=True)
+    os.makedirs(work, exist_ok=True)
     pages = inspect(pdf)
     res = zoom_res(maxzoom)
     tifs = []
     for n, pg in enumerate(pages):
         ground = res * math.cos(math.radians(pg["lat"]))  # metres per target pixel on the ground
         dpi = int(min(MAX_DPI, max(MIN_DPI, 72 * pg["px72"] / ground)))
-        out = os.path.join(WORK, f"{map_id}_p{n}.tif")
+        out = os.path.join(work, f"{map_id}_p{n}.tif")
         args = ["gdalwarp", "-q", "-overwrite", "--config", "GDAL_PDF_DPI", str(dpi),
                 "-t_srs", "EPSG:3857", "-tr", repr(res), repr(res), "-tap", "-r", "bilinear",
                 "-dstalpha", "-co", "COMPRESS=DEFLATE", "-co", "TILED=YES", "-wo", "NUM_THREADS=ALL_CPUS"]
         if pg["neatline"]:
-            cut = os.path.join(WORK, f"{map_id}_p{n}_cut.csv")
-            srs = os.path.join(WORK, f"{map_id}_p{n}.wkt")
+            cut = os.path.join(work, f"{map_id}_p{n}_cut.csv")
+            srs = os.path.join(work, f"{map_id}_p{n}.wkt")
             with open(cut, "w") as f:
                 f.write(f'id,WKT\n1,"{pg["neatline"]}"\n')
             with open(srs, "w") as f:
@@ -172,11 +182,11 @@ ds.FlushCache()
 
 # ---------- per-output tiling ----------
 
-def build_output(tifs, name, maxzoom, fmt="webp", progress=lambda *_: None):
+def build_output(tifs, name, maxzoom, fmt="webp", progress=lambda *_: None, work=WORK):
     """Merge tifs -> MBTiles (zoom maxzoom-6..maxzoom) -> out/<name>.sqlitedb. Returns the path."""
     os.makedirs(OUT, exist_ok=True)
     safe = re.sub(r"[^\w .,()&-]+", "", name).strip() or "MVUM"
-    stem = os.path.join(WORK, re.sub(r"\W+", "_", safe))
+    stem = os.path.join(work, re.sub(r"\W+", "_", safe))
     merged, mbt = stem + "_merged.tif", stem + ".mbtiles"
     for p in (merged, mbt):
         if os.path.exists(p):
@@ -226,6 +236,8 @@ def mbtiles_to_sqlitedb(mbtiles, dest):
 
 def run_job(groups, maxzoom=14, white_transparent=True, fmt="webp", keep_work=False, progress=lambda *a, **k: None):
     """groups: [(output_name, [map, ...])]. progress(event, **kw). Returns [{name, path, size, errors}]."""
+    os.makedirs(WORK, exist_ok=True)
+    work = tempfile.mkdtemp(prefix="job-", dir=WORK)  # per job, so concurrent jobs never clean up each other
     results = []
     for gi, (name, maps) in enumerate(groups):
         tifs, errors = [], []
@@ -236,7 +248,7 @@ def run_job(groups, maxzoom=14, white_transparent=True, fmt="webp", keep_work=Fa
                 p("download", 0)
                 pdf, meta = download(m, p)
                 p("render", 0)
-                t, title = warp_map(pdf, m["id"], maxzoom, white_transparent, p)
+                t, title = warp_map(pdf, m["id"], maxzoom, white_transparent, p, work)
                 tifs += t
                 progress("map_done", group=gi, map=m["id"], title=title, size=meta.get("size"))
             except Exception as e:
@@ -247,7 +259,7 @@ def run_job(groups, maxzoom=14, white_transparent=True, fmt="webp", keep_work=Fa
             try:
                 res["path"] = build_output(tifs, name, maxzoom, fmt,
                                            lambda step, frac: progress("step", group=gi, name=name, map=None,
-                                                                       step=step, frac=frac))
+                                                                       step=step, frac=frac), work)
                 res["size"] = os.path.getsize(res["path"])
             except Exception as e:
                 res["errors"].append(str(e))
@@ -256,6 +268,6 @@ def run_job(groups, maxzoom=14, white_transparent=True, fmt="webp", keep_work=Fa
                 os.remove(t)
         progress("group_done", group=gi, result=res)
         results.append(res)
-    if not keep_work and os.path.isdir(WORK):
-        shutil.rmtree(WORK, ignore_errors=True)
+    if not keep_work:
+        shutil.rmtree(work, ignore_errors=True)
     return results
