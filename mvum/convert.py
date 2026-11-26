@@ -5,7 +5,8 @@ Per map:  download (cached) -> gdalinfo -> gdalwarp (render at the DPI the targe
 Per output (one map, or a whole forest): gdalwarp-merge the clipped tifs -> MBTiles + overviews
           (WebP tiles by default: ~4x smaller than PNG; Android decodes WebP with alpha)
           -> OsmAnd sqlitedb in OsmAnd's own writer layout (tilenumbering 'simple', XYZ rows).
-GDAL runs in the osgeo/gdal ubuntu-full Docker image (the small image cannot read PDFs).
+GDAL runs locally when installed (the container is built on the GDAL image), else in the osgeo/gdal
+ubuntu-full Docker image (the small image cannot read PDFs).
 """
 import json
 import math
@@ -21,10 +22,10 @@ import urllib.request
 from .catalog import UA
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATA = os.path.join(ROOT, "data")
+DATA = os.path.abspath(os.environ.get("MVUM_DATA") or os.path.join(ROOT, "data"))
 PDF_DIR = os.path.join(DATA, "pdf")
 WORK = os.path.join(DATA, "work")
-OUT = os.path.join(ROOT, "out")
+OUT = os.path.abspath(os.environ.get("MVUM_OUT") or os.path.join(ROOT, "out"))
 IMAGE = os.environ.get("MVUM_GDAL_IMAGE", "ghcr.io/osgeo/gdal:ubuntu-full-latest")
 WEB_MERC_RES0 = 156543.03392804097  # m/px at zoom 0
 MIN_DPI, MAX_DPI = 72, 400
@@ -34,10 +35,21 @@ class ConvertError(Exception):
     pass
 
 
+LOCAL_GDAL = os.environ.get("MVUM_GDAL", "auto") == "local" or (
+    os.environ.get("MVUM_GDAL", "auto") == "auto" and shutil.which("gdalinfo") is not None)
+
+
 def gdal(*args, stdin=None):
-    """Run a GDAL command in Docker with ROOT mounted at the same path, as the calling user."""
-    cmd = ["docker", "run", "--rm", "-i", "--user", f"{os.getuid()}:{os.getgid()}",
-           "-v", f"{ROOT}:{ROOT}", "-w", ROOT, "-e", "HOME=/tmp", IMAGE, *args]
+    """Run a GDAL command: directly if GDAL is installed, else in Docker with ROOT (and DATA/OUT when they
+    live elsewhere) mounted at the same path, as the calling user."""
+    if LOCAL_GDAL:
+        cmd = list(args)
+    else:
+        mounts = []
+        for d in [ROOT] + [d for d in (DATA, OUT) if not d.startswith(ROOT + os.sep)]:
+            mounts += ["-v", f"{d}:{d}"]
+        cmd = ["docker", "run", "--rm", "-i", "--user", f"{os.getuid()}:{os.getgid()}",
+               *mounts, "-w", ROOT, "-e", "HOME=/tmp", IMAGE, *args]
     p = subprocess.run(cmd, input=stdin, capture_output=True, text=True)
     if p.returncode != 0:
         raise ConvertError(f"{args[0]} failed: {(p.stderr or p.stdout).strip()[-800:]}")
