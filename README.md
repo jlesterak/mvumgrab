@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 ```
 
-On first start it downloads the USFS national MVUM data (~270 MB), builds every forest's GPX (~6 min, ~420 MB
+On first start it downloads the USFS national MVUM data (~270 MB), builds every forest's GPX (~6 min, ~440 MB
 of GPX), then crawls the forest websites for PDF maps (slow, rate-limited). Both refresh when older than 30 days
 (`MVUM_MAX_AGE_DAYS`). `/admin` is the desktop UI for the PDF catalog and batch conversions. `/healthz` for monitoring.
 

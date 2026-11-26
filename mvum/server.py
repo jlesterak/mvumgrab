@@ -19,6 +19,7 @@ HERE = os.path.dirname(__file__)
 CATALOG = os.path.abspath(os.environ.get("MVUM_CATALOG") or os.path.join(convert.DATA, "catalog.json"))
 STATE = {"crawl": None, "job": None, "vector": None}  # crawl/vector: {running, line, started}; job: see start_job
 LOCK = threading.Lock()
+RASTER_JOBS = {}  # forest key -> the job dict started for it
 RASTER = {}  # forest key -> "queued" | "running" | "error: ..."; on-demand official-map conversions
 MAX_AGE = float(os.environ.get("MVUM_MAX_AGE_DAYS", 30)) * 86400
 TYPES = {".gpx": "application/gpx+xml", ".sqlitedb": "application/octet-stream"}
@@ -97,13 +98,15 @@ def queue_raster(key):
 
 
 def _run_next_raster():
+    for k, job in list(RASTER_JOBS.items()):  # settle finished jobs against their own job object
+        if job["running"]:
+            return
+        g = (job.get("groups") or [{}])[0]
+        RASTER[k] = None if g.get("state") == "done" else "error: " + str((g.get("result") or {}).get("errors")
+                                                                          or job.get("error"))
+        del RASTER_JOBS[k]
     if STATE["job"] and STATE["job"]["running"]:
         return
-    for k, state in list(RASTER.items()):
-        if state == "running":  # the job we started has finished
-            g = (STATE["job"] or {}).get("groups") or [{}]
-            RASTER[k] = None if g[0].get("state") == "done" else "error: " + str(
-                (g[0].get("result") or {}).get("errors") or STATE["job"].get("error"))
     queued = [k for k, s in RASTER.items() if s == "queued"]
     if not queued:
         return
@@ -112,6 +115,7 @@ def _run_next_raster():
     ids = {m["id"] for m in (forest or {}).get("maps", [])}
     if ids and start_job(ids, 14, "forest", True, "webp"):
         RASTER[queued[0]] = "running"
+        RASTER_JOBS[queued[0]] = STATE["job"]
     elif not ids:
         RASTER[queued[0]] = "error: no PDF maps"
 
@@ -145,7 +149,7 @@ def maintain(tick=15):
             if time.time() - last_check > 3600:
                 last_check = time.time()
                 if _stale(vector.INDEX) or any(_size(vector.gpx_name(n)) is None for n in vector.load_index()):
-                    start_vector()
+                    threading.Thread(target=start_vector, daemon=True).start()  # ~6 min; don't block rasters
                 if _stale(CATALOG) and not (STATE["crawl"] and STATE["crawl"]["running"]):
                     start_crawl()
             _run_next_raster()
