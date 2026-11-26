@@ -1,0 +1,13 @@
+{
+  "name": "MVUM maps",
+  "short_name": "MVUM",
+  "description": "USFS Motor Vehicle Use Maps for OsmAnd, offline",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#1d3b2a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

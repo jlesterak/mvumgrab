@@ -1,4 +1,5 @@
-"""Headless browser smoke test of the UI. Needs `playwright` (any venv) and a catalog that includes Chugach.
+"""Headless browser smoke test of the phone app and the admin UI. Needs `playwright` (any venv), a catalog that
+includes Chugach and built vector data (`python3 -m mvum.vector`).
 
     <venv>/bin/python tests/ui_smoke.py          # browse/select checks only
     <venv>/bin/python tests/ui_smoke.py --convert  # also converts one map at zoom 13 (~1-2 min)
@@ -17,9 +18,39 @@ PORT = 8799
 URL = f"http://127.0.0.1:{PORT}/"
 
 
+def phone(b):
+    """PWA: download Chugach roads & trails, go offline, reload: the app, the forest and its file still work."""
+    ctx = b.new_context(viewport={"width": 400, "height": 850}, accept_downloads=True)
+    pg = ctx.new_page()
+    pg.goto(URL)
+    pg.wait_for_function("navigator.serviceWorker.controller || navigator.serviceWorker.ready")
+    pg.click("#tab-all")
+    pg.fill("#q", "chugach")
+    card = pg.locator(".forest", has_text="Chugach National Forest")
+    card.locator("button[data-get$='.gpx']").click()
+    card.locator(".have").first.wait_for(timeout=30000)
+    print("ok  phone: roads & trails downloaded into the cache")
+    pg.reload()  # make sure the service worker controls the page before going offline
+    pg.wait_for_function("navigator.serviceWorker.controller")
+    ctx.set_offline(True)
+    pg.reload()
+    pg.wait_for_selector(".forest", timeout=10000)
+    assert pg.text_content("#net") == "offline", pg.text_content("#net")
+    assert "Chugach National Forest" in pg.text_content("#list")
+    print("ok  phone: app opens offline, Chugach listed under On this phone")
+    with pg.expect_download() as dl:
+        pg.locator(".forest", has_text="Chugach").locator("button[data-open$='.gpx']").click()
+    path = dl.value.path()
+    with open(path) as fh:
+        assert "<gpx" in fh.read(400)
+    print(f"ok  phone: Open in OsmAnd hands over {dl.value.suggested_filename} offline")
+    pg.screenshot(path=os.path.join(ROOT, "data", "ui_smoke_phone.png"))
+    ctx.close()
+
+
 def main():
     convert = "--convert" in sys.argv
-    srv = subprocess.Popen(["python3", "-m", "mvum.server", "--port", str(PORT)], cwd=ROOT)
+    srv = subprocess.Popen(["python3", "-m", "mvum.server", "--port", str(PORT), "--no-maintain"], cwd=ROOT)
     try:
         for _ in range(50):
             try:
@@ -31,9 +62,10 @@ def main():
         total = sum(len(f.get("maps", [])) for r in cat["regions"] for f in r["forests"])
         with sync_playwright() as p:
             b = p.chromium.launch(args=["--mute-audio"])
+            phone(b)
             pg = b.new_page(viewport={"width": 1300, "height": 900})
             pg.on("dialog", lambda d: d.accept())
-            pg.goto(URL)
+            pg.goto(URL + "admin")
             pg.wait_for_function("document.querySelector('#catinfo').textContent.includes('maps')")
 
             pg.fill("#filter", "chugach")
