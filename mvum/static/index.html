@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mvumgrab</title>
+<style>
+:root{--bg:#f4f2ec;--panel:#fff;--ink:#1f2a1f;--mute:#6b7466;--line:#d9d5c9;--acc:#2f6b3a;--acc2:#e8f0e3;--warn:#a5631b;--bad:#a33;}
+@media (prefers-color-scheme:dark){:root{--bg:#161a16;--panel:#1e231e;--ink:#e3e8df;--mute:#93a08e;--line:#323a31;--acc:#7fbf7a;--acc2:#24321f;--warn:#e0a15a;--bad:#e77;}}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;gap:16px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2;flex-wrap:wrap}
+h1{font-size:17px;margin:0;letter-spacing:.02em}
+h1 span{color:var(--acc)}
+.mute{color:var(--mute)}
+button{font:inherit;padding:5px 11px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+@media (prefers-color-scheme:dark){button.primary{color:#102010}}
+button:disabled{opacity:.5;cursor:default}
+main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;padding:16px 18px;align-items:start}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.toolbar{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.toolbar input[type=search]{flex:1;min-width:180px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+#tree{padding:4px 0}
+.row{display:flex;align-items:center;gap:8px;padding:3px 10px;min-height:28px}
+.row:hover{background:var(--acc2)}
+.region>.row{font-weight:650;border-top:1px solid var(--line)}
+.forest>.row{padding-left:30px}
+.map{padding-left:58px}
+.twist{width:16px;text-align:center;cursor:pointer;color:var(--mute);user-select:none}
+.name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.sub{color:var(--mute);font-size:12px;margin-left:6px}
+.badge{font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.badge.ok{border-color:var(--acc);color:var(--acc)}
+.badge.warn{border-color:var(--warn);color:var(--warn)}
+.badge.bad{border-color:var(--bad);color:var(--bad)}
+a{color:var(--acc)}
+.side{position:sticky;top:64px;display:flex;flex-direction:column;gap:14px}
+.side section{padding:12px}
+.side h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;color:var(--mute)}
+.opt{display:flex;justify-content:space-between;align-items:center;margin:6px 0;gap:8px}
+select{font:inherit;padding:3px 6px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;background:var(--acc);transition:width .3s}
+.job .g{margin:8px 0;padding-bottom:6px;border-bottom:1px dashed var(--line)}
+.job .m{font-size:12px;color:var(--mute);margin-left:10px}
+.err{color:var(--bad);font-size:12px}
+.outs li{display:flex;gap:6px;align-items:center;margin:4px 0}
+.outs ul{list-style:none;padding:0;margin:0}
+.outs .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.x{border:none;background:none;color:var(--mute);padding:0 4px}
+details{font-size:13px;color:var(--mute)} details code{font-size:12px;word-break:break-all}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+</style>
+</head>
+<body>
+<header>
+  <h1>mvum<span>grab</span></h1>
+  <span class="mute" id="catinfo">loading…</span>
+  <span style="flex:1"></span>
+  <span class="mute" id="crawlline"></span>
+  <button id="retry" title="Re-crawl only forests the USFS firewall blocked">Retry blocked</button>
+  <button id="refresh">Refresh catalog</button>
+</header>
+<main>
+  <div class="card">
+    <div class="toolbar">
+      <input type="search" id="filter" placeholder="Filter regions, forests, maps…  (e.g. chugach, kenai, r10)">
+      <button id="selall">Select all shown</button>
+      <button id="clear">Clear</button>
+      <button id="expand">Expand all</button>
+      <label class="mute"><input type="checkbox" id="onlymaps" checked> hide forests without maps</label>
+    </div>
+    <div id="tree"></div>
+  </div>
+  <div class="side">
+    <section class="card">
+      <h2>Convert</h2>
+      <div id="selsum" class="mute">Nothing selected</div>
+      <div class="opt"><label for="maxzoom">Max zoom</label>
+        <select id="maxzoom"><option>13</option><option selected>14</option><option>15</option></select></div>
+      <div class="opt"><label for="per">Output</label>
+        <select id="per"><option value="forest" selected>One file per forest</option><option value="map">One file per map</option></select></div>
+      <div class="opt"><label for="fmt">Tiles</label>
+        <select id="fmt"><option value="webp" selected>WebP (small)</option><option value="png">PNG (~4x larger)</option></select></div>
+      <div class="opt"><label for="white">Make white transparent</label><input type="checkbox" id="white" checked></div>
+      <button class="primary" id="go" style="width:100%;margin-top:6px" disabled>Convert selected</button>
+      <div class="job" id="job"></div>
+    </section>
+    <section class="card outs">
+      <h2>Ready for OsmAnd</h2>
+      <ul id="outs"></ul>
+      <details><summary>How to load on the phone</summary>
+        <p>Copy the <code>.sqlitedb</code> files to the phone's <code>Android/media/net.osmand.plus/files/tiles/</code>
+        (F-Droid build may be <code>net.osmand.dev</code> — use whichever exists), or open the file on the phone and
+        choose OsmAnd.</p>
+        <p>OsmAnd → Configure map → <b>Overlay map</b> → pick the MVUM. Transparency slider on the map.</p>
+        <p class="mute" id="outdir"></p>
+      </details>
+    </section>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let CAT = {regions: []}, sel = new Set(), open = new Set(), lastJobRunning = false;
+const fmtMB = b => b ? (b / 1048576).toFixed(b > 1e8 ? 0 : 1) + ' MB' : '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const STATUS = {none: ['none found', 'warn'], blocked: ['blocked — retry', 'bad'], 'avenza-only': ['Avenza only', 'warn']};
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {});
+  return r.json();
+}
+async function loadCatalog() {
+  CAT = await api('/api/catalog');
+  const nf = CAT.regions.reduce((a, r) => a + r.forests.length, 0);
+  const nm = CAT.regions.reduce((a, r) => a + r.forests.reduce((b, f) => b + (f.maps || []).length, 0), 0);
+  $('#catinfo').textContent = CAT.updated ? `${nm} maps · ${nf} forests · catalog ${CAT.updated.replace('T', ' ')}` : 'No catalog yet — press Refresh catalog';
+  render();
+}
+function visible() {
+  // returns [{r, forests:[{f, maps:[m]}]}] after filter
+  const q = $('#filter').value.trim().toLowerCase(), only = $('#onlymaps').checked;
+  const hit = s => !q || String(s || '').toLowerCase().includes(q);
+  const out = [];
+  for (const r of CAT.regions) {
+    const rHit = hit(r.id) || hit(r.name), fs = [];
+    for (const f of r.forests) {
+      const maps = f.maps || [];
+      if (only && !maps.length) continue;
+      const fHit = rHit || hit(f.name) || hit(f.slug);
+      const ms = fHit ? maps : maps.filter(m => hit(m.name) || hit(m.title));
+      if (fHit || ms.length) fs.push({f, maps: ms});
+    }
+    if (fs.length) out.push({r, forests: fs});
+  }
+  return out;
+}
+function triState(ids) {
+  if (!ids.length) return [false, false];
+  const n = ids.filter(i => sel.has(i)).length;
+  return [n === ids.length, n > 0 && n < ids.length];
+}
+function render() {
+  const v = visible(), q = $('#filter').value.trim();
+  const tree = $('#tree');
+  if (!v.length) { tree.innerHTML = `<div class="empty">${CAT.regions.length ? 'Nothing matches.' : 'No catalog yet.'}</div>`; updateSel(); return; }
+  let h = '';
+  for (const {r, forests} of v) {
+    const ids = forests.flatMap(x => x.maps.map(m => m.id));
+    const [c, ind] = triState(ids), ro = open.has(r.id) || q;
+    h += `<div class="region"><div class="row"><span class="twist" data-t="${r.id}">${ro ? '▾' : '▸'}</span>
+      <input type="checkbox" data-ids="${ids.join(',')}" ${c ? 'checked' : ''} ${ind ? 'data-ind="1"' : ''} ${ids.length ? '' : 'disabled'}>
+      <span class="name" data-t="${r.id}">${esc(r.name)} <span class="sub">${r.id} · ${forests.length} forests · ${ids.length} maps</span></span></div>`;
+    if (ro) for (const {f, maps} of forests) {
+      const fid = r.id + '/' + f.slug, fids = maps.map(m => m.id), [fc, fi] = triState(fids), fo = open.has(fid) || q;
+      const st = STATUS[f.status];
+      h += `<div class="forest"><div class="row"><span class="twist" data-t="${fid}">${maps.length ? (fo ? '▾' : '▸') : ''}</span>
+        <input type="checkbox" data-ids="${fids.join(',')}" ${fc ? 'checked' : ''} ${fi ? 'data-ind="1"' : ''} ${fids.length ? '' : 'disabled'}>
+        <span class="name" data-t="${fid}">${esc(f.name)} <span class="sub">${maps.length} map${maps.length === 1 ? '' : 's'}</span></span>
+        ${f.output ? `<span class="badge ok" title="${esc(f.output)}">converted</span>` : ''}
+        ${st ? `<span class="badge ${st[1]}">${st[0]}</span>` : ''}
+        <a href="${esc((f.pages && f.pages[0]) || f.url)}" target="_blank" rel="noopener" class="sub">usfs ↗</a></div>`;
+      if (fo) for (const m of maps) {
+        h += `<div class="row map"><input type="checkbox" data-ids="${m.id}" ${sel.has(m.id) ? 'checked' : ''}>
+          <span class="name" title="${esc(m.url)}">${esc(m.title || m.name)}${m.title && m.title !== m.name ? `<span class="sub">${esc(m.name)}</span>` : ''}</span>
+          ${m.cached ? `<span class="badge" title="PDF cached${m.modified ? ', USFS date ' + esc(m.modified) : ''}">cached ${fmtMB(m.size)}</span>` : ''}
+          <a href="${esc(m.url)}" target="_blank" rel="noopener" class="sub">pdf ↗</a></div>`;
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  tree.innerHTML = h;
+  tree.querySelectorAll('[data-ind]').forEach(e => e.indeterminate = true);
+  updateSel();
+}
+function updateSel() {
+  const all = CAT.regions.flatMap(r => r.forests.flatMap(f => (f.maps || []).map(m => [f, m])));
+  const chosen = all.filter(([, m]) => sel.has(m.id));
+  const forests = new Set(chosen.map(([f]) => f.slug));
+  const known = chosen.reduce((a, [, m]) => a + (m.size || 0), 0);
+  $('#selsum').textContent = chosen.length ? `${chosen.length} map${chosen.length > 1 ? 's' : ''} in ${forests.size} forest${forests.size > 1 ? 's' : ''}` +
+    (known ? ` · ${fmtMB(known)} of PDFs cached` : '') + ` · ~2 min per map` : 'Nothing selected';
+  $('#go').disabled = !chosen.length || lastJobRunning;
+}
+$('#tree').addEventListener('click', e => {
+  const t = e.target.closest('[data-t]');
+  if (t) { const k = t.dataset.t; open.has(k) ? open.delete(k) : open.add(k); render(); }
+});
+$('#tree').addEventListener('change', e => {
+  if (!e.target.dataset.ids) return;
+  const ids = e.target.dataset.ids.split(',').filter(Boolean);
+  ids.forEach(i => e.target.checked ? sel.add(i) : sel.delete(i));
+  render();
+});
+$('#filter').addEventListener('input', render);
+$('#onlymaps').addEventListener('change', render);
+$('#selall').onclick = () => { visible().forEach(x => x.forests.forEach(y => y.maps.forEach(m => sel.add(m.id)))); render(); };
+$('#clear').onclick = () => { sel.clear(); render(); };
+$('#expand').onclick = () => {
+  const v = visible(), anyClosed = v.some(x => !open.has(x.r.id));
+  v.forEach(x => { anyClosed ? open.add(x.r.id) : open.delete(x.r.id); x.forests.forEach(y => anyClosed ? open.add(x.r.id + '/' + y.f.slug) : open.delete(x.r.id + '/' + y.f.slug)); });
+  $('#expand').textContent = anyClosed ? 'Collapse all' : 'Expand all'; render();
+};
+$('#refresh').onclick = async () => { await api('/api/refresh', {}); poll(); };
+$('#retry').onclick = async () => { await api('/api/refresh', {retry_blocked: true}); poll(); };
+$('#go').onclick = async () => {
+  const r = await api('/api/convert', {ids: [...sel], maxzoom: +$('#maxzoom').value, per: $('#per').value, white: $('#white').checked, fmt: $('#fmt').value});
+  if (r.error) alert(r.error);
+  poll();
+};
+function renderJob(j) {
+  if (!j) { $('#job').innerHTML = ''; return; }
+  $('#job').innerHTML = (j.running ? '' : `<p class="mute">Finished ${esc(j.finished || '')}</p>`) + j.groups.map(g => {
+    const done = g.maps.filter(m => m.state === 'done' || m.state === 'error').length;
+    const cur = g.maps.find(m => m.state === 'running');
+    const frac = g.state === 'done' ? 1 : (done + (cur ? cur.frac * .9 : 0)) / (g.maps.length + 1);
+    return `<div class="g"><b>${esc(g.name)}</b> <span class="sub">${g.state === 'running' ? esc(g.step) : g.state}</span>
+      <div class="bar"><i style="width:${Math.round(frac * 100)}%"></i></div>
+      ${g.maps.map(m => `<div class="m">${m.state === 'done' ? '✓' : m.state === 'error' ? '✗' : m.state === 'running' ? '…' : '·'} ${esc(m.name)}${m.state === 'running' ? ' — ' + esc(m.step) : ''}${m.error ? `<div class="err">${esc(m.error)}</div>` : ''}</div>`).join('')}
+      ${g.result && g.result.errors.length && !g.maps.some(m => m.error) ? `<div class="err">${esc(g.result.errors.join('; '))}</div>` : ''}
+      ${g.result && g.result.path ? `<div class="m">→ ${fmtMB(g.result.size)}</div>` : ''}</div>`;
+  }).join('');
+}
+function renderOuts(outs, dir) {
+  $('#outdir').textContent = 'Files are in ' + dir;
+  $('#outs').innerHTML = outs.length ? outs.map(o => `<li><span class="n" title="${esc(o.name)}">${esc(o.name)}</span>
+    <span class="sub">${fmtMB(o.size)}</span><a href="/out/${encodeURIComponent(o.name)}" title="Download">⬇</a>
+    <button class="x" data-del="${esc(o.name)}" title="Delete">✕</button></li>`).join('') : '<li class="mute">None yet</li>';
+}
+$('#outs').addEventListener('click', async e => {
+  const n = e.target.dataset.del;
+  if (n && confirm('Delete ' + n + '?')) { await api('/api/delete-output', {name: n}); poll(); }
+});
+let timer = null;
+async function poll() {
+  clearTimeout(timer);
+  const s = await api('/api/status');
+  const c = s.crawl;
+  $('#crawlline').textContent = c ? (c.running ? 'Crawling: ' + c.line : c.error ? 'Crawl error: ' + c.error : '') : '';
+  $('#refresh').disabled = $('#retry').disabled = !!(c && c.running);
+  const wasRunning = lastJobRunning;
+  lastJobRunning = !!(s.job && s.job.running);
+  renderJob(s.job);
+  renderOuts(s.outputs, s.out_dir);
+  if ((c && !c.running && $('#crawlline').dataset.was === '1') || (wasRunning && !lastJobRunning)) loadCatalog();
+  $('#crawlline').dataset.was = c && c.running ? '1' : '0';
+  updateSel();
+  timer = setTimeout(poll, (c && c.running) || lastJobRunning ? 1500 : 10000);
+}
+loadCatalog().then(poll);
+</script>
+</body>
+</html>
